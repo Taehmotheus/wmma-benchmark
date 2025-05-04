@@ -6,4 +6,4 @@ template <typename T> void random_matrix(T *mat, int n) {
     }
 }
 
-template <typename T> T random_value() { static_cast<T>(rand()) / RAND_MAX * 20.0 - 10.0; }
+template <typename T> T random_value() { return static_cast<T>(rand()) / RAND_MAX * 20.0 - 10.0; }

@@ -5,6 +5,8 @@
 #include <rocblas/rocblas.h>
 #include <vector>
 
+#include "../include/common_utils.hpp"
+
 void random_init(double *mat, int n) {
     for (int i = 0; i < n * n; i++) {
         mat[i] = static_cast<double>(rand()) / RAND_MAX * 20.0 - 10.0;
@@ -19,19 +21,18 @@ int main() {
 
     std::cout << "Running on GPU: " << device_id << std::endl;
 
-    auto startWall = std::chrono::high_resolution_clock::now();
-    int mat_sizes[] = {128,  256,  512,  1024,
-                       2048, 4096, 8192, 16384 /*, 32768  , 65536 , 131072, 262144*/};
+    int mat_sizes[] = {128, 256, 512, 1024, 2048, 4096, 8192, 16384};
     int n_sizes = sizeof(mat_sizes) / sizeof(mat_sizes[0]);
 
+    // Loop over all Matrix sizes
     for (int i = 0; i < n_sizes; i++) {
         int N = mat_sizes[i];
         int size = N * N;
 
-        // Host memory
+        // Initialize memory on host
         std::vector<double> h_A(size), h_B(size), h_C(size);
-        random_init(h_A.data(), N);
-        random_init(h_B.data(), N);
+        random_matrix<double>(h_A.data(), N);
+        random_matrix<double>(h_B.data(), N);
 
         // Device memory
         double *d_A, *d_B, *d_C;
@@ -47,9 +48,9 @@ int main() {
         rocblas_create_handle(&handle);
 
         // Warmup
-        double alpha = 1.0, beta = 1.0;
-        rocblas_dgemm_64(handle, rocblas_operation_none, rocblas_operation_none, N, N, N, &alpha,
-                         d_A, N, d_B, N, &beta, d_C, N);
+        double alpha = random_value<double>(), beta = random_value<double>();
+        rocblas_dgemm(handle, rocblas_operation_none, rocblas_operation_none, N, N, N, &alpha, d_A,
+                      N, d_B, N, &beta, d_C, N);
         hipDeviceSynchronize();
 
         // Initialize GPU Events for precise timing
@@ -58,14 +59,14 @@ int main() {
         hipEventCreate(&stopEvent);
 
         // Timed runs
-        const int n_repeats = 1;
+        const int n_repeats = 10;
         hipEventRecord(startEvent, 0); // Start Event
         for (int j = 0; j < n_repeats; j++) {
             rocblas_dgemm(handle, rocblas_operation_none, rocblas_operation_none, N, N, N, &alpha,
                           d_A, N, d_B, N, &beta, d_C, N);
         }
         hipDeviceSynchronize();
-        hipEventRecord(stopEvent, 0); // Stop Event
+        hipEventRecord(stopEvent); // Stop Event
 
         // Synchronize and get elapsed time
         hipEventSynchronize(stopEvent);
@@ -73,23 +74,18 @@ int main() {
         hipEventElapsedTime(&elapsedTime, startEvent, stopEvent);
 
         // Compute the average time and GFLOPS
-        double avg_time = elapsedTime / n_repeats / 1000.0; // in seconds
-        double tflops = 2.0 * N * N * N * 1e-9 / avg_time;
+        double avg_time = (elapsedTime / 1000) / n_repeats;
+        double gflops = 2.0 * N * N * N * 1e-9 / avg_time;
 
         std::cout << "N: " << std::setw(6) << N << " | Time: " << std::fixed << std::setprecision(6)
                   << avg_time << " s"
-                  << " | GFLOPS: " << std::fixed << std::setprecision(2) << tflops << "\n";
+                  << " | GFLOPS: " << std::fixed << std::setprecision(2) << gflops << "\n";
 
         // Cleanup
         hipFree(d_A);
         hipFree(d_B);
         hipFree(d_C);
         rocblas_destroy_handle(handle);
-        hipEventDestroy(startEvent);
-        hipEventDestroy(stopEvent);
     }
-    auto endWall = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsedWall = endWall - startWall;
-    std::cout << elapsedWall.count() << " s";
     return 0;
 }

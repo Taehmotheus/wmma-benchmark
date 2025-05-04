@@ -8,8 +8,15 @@
 #include "../include/common_utils.hpp"
 
 int main() {
+    int device_id;
+
+    // Get the current device being used
+    cudaGetDevice(&device_id);
+
+    std::cout << "Running on GPU: " << device_id << std::endl;
+
     int mat_sizes[] = {128, 256, 512, 1024, 2048, 4096, 8192, 16384};
-    int n_sizes = mat_sizes.size();
+    int n_sizes = sizeof(mat_sizes) / sizeof(mat_sizes[0]);
 
     // Loop over all Matrix sizes
     for (int i = 0; i < n_sizes; i++) {
@@ -55,16 +62,17 @@ int main() {
         cudaDeviceSynchronize();
         cudaEventRecord(stop);
 
+        // Kerneltime calculation
         cudaEventSynchronize(stop);
-        float milliseconds = 0;
-        cudaEventElapsedTime(&milliseconds, start, stop);
+        float elapsedTime = 0;
+        cudaEventElapsedTime(&elapsedTime, start, stop);
 
-        double avg_time = milliseconds / n_repeats;
-        double tflops = 2.0 * N * N * N * 1e-9 / avg_time;
+        double avg_time = (elapsedTime / 1000) / n_repeats;
+        double gflops = 2.0 * N * N * N * 1e-9 / avg_time;
 
         std::cout << "N: " << std::setw(6) << N << " | Time: " << std::fixed << std::setprecision(6)
                   << avg_time << " s"
-                  << " | TFLOPS: " << std::fixed << std::setprecision(2) << tflops << "\n";
+                  << " | GFLOPS: " << std::fixed << std::setprecision(2) << gflops << "\n";
 
         // Cleanup
         cudaFree(d_A);
