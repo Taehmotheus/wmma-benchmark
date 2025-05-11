@@ -29,5 +29,9 @@ dgemm_naive_wmma_sycl_cuda.x: src/cuda_joint_matrix_FP64.cpp
 dgemm_naive_wmma_cuda.x: src/cuda_wmma_FP64.cu
 	$(CCNVIDIA) -Iinclude src/cuda_wmma_FP64.cu -o dgemm_rocblas.x -arch=sm_80 -lcublas
 
+dgemm_naive_wmma_amd.x: src/amd_wmma_FP64.cpp
+	$(CCAMD) -std=c++17 -lrocblas src/amd_wmma_FP64.cpp -o dgemm_rocblas.x --offload-arch=gfx90a
+
+
 clean:
 	rm *.x
